@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>UNDERTALE</title>
+    <style>
+        body { background:#000; color:#fff; font-family:monospace; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; margin:0; user-select:none; overflow:hidden; }
+        #board { width:560px; height:280px; border:6px solid #fff; position:relative; overflow:hidden; }
+        #heart { width:16px; height:16px; position:absolute; left:272px; top:132px; z-index:10; }
+        .h-pix { width:2px; height:2px; background:#f00; position:absolute; }
+        .bullet { width:12px; height:12px; background:#fff; position:absolute; border-radius:2px; }
+        .wl { position:absolute; width:100%; height:4px; background:#800080; opacity:0.6; display:none; }
+        #ui { width:572px; display:flex; align-items:center; font-size:22px; font-weight:bold; margin-top:15px; }
+        #hp-bg { width:80px; height:20px; background:#f00; margin:0 12px; border:1px solid #000; }
+        #hp-b { width:100%; height:100%; background:#ff0; }
+        #txt { width:546px; height:70px; font-size:20px; border:6px dashed #222; margin-top:15px; padding:12px; display:flex; align-items:center; }
+        #cmds { width:572px; display:flex; justify-content:space-around; margin-top:15px; }
+        .btn { border:3px solid #ff7f27; background:transparent; color:#ff7f27; font-size:22px; padding:8px 35px; font-weight:bold; }
+        .btn.selected { color:#fff000; border-color:#fff000; background:rgba(255,255,0,0.15); }
+        .btn.dis { border-color:#444; color:#444; }
+        #nxt { display:none; margin-top:15px; }
+        .n-btn { background:transparent; font-size:24px; padding:10px 50px; font-weight:bold; cursor:pointer; }
+        .hard-next-btn { border:3px solid #f00; color:#f00; background:transparent; font-size:24px; padding:10px 50px; font-weight:bold; cursor:pointer; text-shadow:0 0 5px #f00; box-shadow:0 0 10px rgba(255,0,0,0.3); }
+        .hard-next-btn:hover { color:#fff; border-color:#fff; background:rgba(255,0,0,0.3); }
+        .next-btn { border:3px solid #00ff00; color:#00ff00; }
+        .next-btn:hover { color:#fff; border-color:#fff; background:rgba(0,255,0,0.2); }
+    </style>
+</head>
+<body>
+    <div id="bname" style="font-size:28px; font-weight:bold; margin-bottom:12px;">???</div>
+    <div id="board">
+        <div id="wl1" class="wl" style="top:70px;"></div>
+        <div id="wl2" class="wl" style="top:140px;"></div>
+        <div id="wl3" class="wl" style="top:210px;"></div>
+        <div id="heart"></div>
+    </div>
+    <div id="ui">
+        <span style="color:#0f0">FRISK</span>&nbsp;&nbsp;LV 19&nbsp;&nbsp;HP
+        <div id="hp-bg"><div id="hp-b"></div></div>
+        <span id="hp-n">100/100</span>
+        <span style="font-size:16px; margin-left:auto; color:#aaa;">回復:<span id="hc" style="color:#0f0">4</span></span>
+    </div>
+    <div id="txt">* コマンドを選択しろ。</div>
+    <div id="cmds">
+        <div id="f-btn" class="btn">⚔️ FIGHT</div>
+        <div id="i-btn" class="btn">❤️ ITEM</div>
+    </div>
+    <div id="nxt"><span id="n-slot"></span></div>
+<!-- パーツ2へ続く -->
+<script>
+    const bM = [
+        { n: "トリエル", m: 25, s: 220, sp: 4.2, p: "fire" },
+        { n: "パピルス", m: 25, s: 180, sp: 5.5, p: "bone" },
+        { n: "メタトンNEO", m: 25, s: 140, sp: 4.8, p: "laser" },
+        { n: "マフェット", m: 25, s: 120, sp: 5.0, p: "spider" },
+        { n: "アズゴア＆フリスク", m: 30, s: 130, sp: 5.8, p: "asgore" },
+        { n: "サンズ", m: 35, s: 85, sp: 7.2, p: "sans" },
+        { n: "不死身のアンダイン", m: 35, s: 70, sp: 7.5, p: "undyne" }
+    ];
+    let hp=100, item=4, bIdx=0, enemy=false, over=false, boss, bArr=[], bTim, gTim, inv=0, bList=[];
+    let hX=272, hY=132, sel=0, tStart=0;
+    const keys = { ArrowUp:0, ArrowDown:0, ArrowLeft:0, ArrowRight:0 };
+    const hEl = document.getElementById("heart"), bd = document.getElementById("board");
+    const hPat = ["1,0","2,0","5,0","6,0","0,1","1,1","2,1","3,1","4,1","5,1","6,1","7,1","0,2","1,2","2,2","3,2","4,2","5,2","6,2","7,2","0,3","1,3","2,3","3,3","4,3","5,3","6,3","7,2","1,4","2,4","3,4","4,4","5,4","6,4","2,5","3,5","4,5","5,5","3,6","4,6"];
+    
+    function drawH() { hEl.innerHTML = ""; hPat.forEach(p => { const [x, y] = p.split(",").map(Number); const d = document.createElement("div"); d.className = "h-pix"; d.style.left = (x * 2) + "px"; d.style.top = (y * 2) + "px"; hEl.appendChild(d); }); }
+    function init() { hp=100; item=4; bIdx=0; bList=bM.map(b => ({ ...b, h: b.m })); document.getElementById("cmds").style.display = "flex"; document.getElementById("nxt").style.display = "none"; loadB(); clearInterval(gTim); gTim = setInterval(loop, 16); }
+    function loadB() { enemy=false; over=false; hX=272; hY=132; boss=bList[bIdx]; sel=0; hEl.style.display="none"; toggleL(false); bArr.forEach(b => b.e.remove()); bArr=[]; clearInterval(bTim); uUI(); bd.style.borderColor = bIdx>=4?"#f00":"#fff"; document.getElementById("bname").innerText = `${boss.n} (HP: ${boss.h})`; document.getElementById("txt").innerText = `* STAGE ${bIdx+1}: ${bIdx>=4?"【後半戦】":""}${boss.n}`; }
+    
+    window.onload = () => { drawH(); init(); window.addEventListener("keydown", (e) => { if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code)>-1) e.preventDefault(); if (!enemy && !over) { if (e.key === "ArrowLeft") { sel=0; uUI(); } if (e.key === "ArrowRight") { if (item>0) sel=1; uUI(); } if (e.key === "z" || e.key === "Z" || e.key === "Enter") { if (sel===0) atk(); else if (sel===1 && item>0) heal(); } } if(e.key in keys) keys[e.key]=1; if(over && e.key === " ") init(); }); window.addEventListener("keyup", (e) => { if(e.key in keys) keys[e.key]=0; }); };
+    function uUI() { document.getElementById("hp-n").innerText = `${hp}/100`; document.getElementById("hp-b").style.width = `${hp}%`; document.getElementById("hc").innerText = item; document.getElementById("i-btn").className = item<=0?"btn dis":"btn"; if (!enemy && !over) { document.getElementById("f-btn").className = sel===0?"btn selected":"btn"; if(item>0) document.getElementById("i-btn").className = sel===1?"btn selected":"btn"; } else { document.getElementById("f-btn").className="btn"; document.getElementById("i-btn").className=item<=0?"btn dis":"btn"; } document.getElementById("bname").innerText = `${boss.n} (HP: ${boss.h})`; }
+    function atk() { if (enemy || over) return; enemy=true; uUI(); if (Math.random() < 0.75) { boss.h-=5; if (boss.h<0) boss.h=0; document.getElementById("txt").innerHTML = `* 💥 命中！ ${boss.n}に 5ダメージ！`; } else { document.getElementById("txt").innerHTML = `* ❌ MISS！ かわされた！`; } uUI(); setTimeout(() => { if (boss.h<=0) win(); else startE(); }, 1000); }
+    function heal() { if (enemy || over || item <= 0) return; enemy=true; hp=100; item--; document.getElementById("txt").innerHTML = "* ❤️ HP全回復！"; uUI(); setTimeout(startE, 1000); }
+    function toggleL(s) { const d = (s && boss.p === "spider") ? "block" : "none"; document.getElementById("wl1").style.display=d; document.getElementById("wl2").style.display=d; document.getElementById("wl3").style.display=d; }
+    function startE() { enemy=true; uUI(); document.getElementById("txt").innerText = "* 攻撃を耐え抜け！"; hX=272; hY=132; hEl.style.display="block"; if(boss.p==="spider") toggleL(true); tStart=Date.now(); bTim=setInterval(spawn, boss.s); setTimeout(endE, 6000); }
+    function endE() { clearInterval(bTim); bArr.forEach(b => b.e.remove()); bArr=[]; enemy=false; hEl.style.display="none"; toggleL(false); if (!over) { uUI(); document.getElementById("txt").innerText = "* あなたのターンだ。"; } }
+<!-- パーツ3へ続く -->
+    function spawn() {
+        if (!enemy || over) return; const e = document.createElement("div"); e.className = "bullet"; bd.appendChild(e);
+        let x=0, y=0, vx=0, vy=0, m=boss.p, el=(Date.now()-tStart)/1000;
+        if (m === "fire") { if (el<2) { x=Math.random()*548; vy=boss.sp; m="f-fall"; } else if (el<4) { let r=Math.random()<0.5; x=r?548:0; vx=r?-boss.sp:boss.sp; vy=boss.sp; } else { x=Math.random()*548; y=268; vy=-boss.sp; } }
+        else if (m === "bone") { if (el<2) { x=560; y=280-(Math.sin(Date.now()/200)*40+60); vx=-boss.sp; } else if (el<4) { let r=Math.random()<0.5; x=r?0:548; y=268; vx=r?boss.sp:-boss.sp; vy=-boss.sp; } else { m="b-shk"; let c=bArr.filter(b=>b.m==="b-shk"&&!b.sk).length; let a=(c*25)*Math.PI/180; x=hX+Math.cos(a)*160; y=hY+Math.sin(a)*160; } }
+        else if (m === "laser") { if (el<2) { let s=Math.random()<0.5; x=s?0:548; y=Math.random()*268; vx=s?boss.sp+2:-boss.sp-2; } else if (el<4) { let c=Math.floor(Math.random()*4); x=c%2===0?0:548; y=c<2?0:268; let d=Math.sqrt((hX-x)**2+(hY-y)**2); vx=((hX-x)/d)*(boss.sp+1); vy=((hY-y)/d)*(boss.sp+1); } else { m="l-crs"; x=Math.random()*548; y=Math.random()*268; } }
+        else if (m === "spider") { if (el<2) { x=Math.random()<0.5?0:548; y=([Math.floor(Math.random()*3)]-6); vx=x===0?boss.sp:-boss.sp; } else if (el<4) { x=Math.random()<0.5?0:548; m="s-bnc"; vx=x===0?4:-4; vy=boss.sp; } else { x=Math.random()*548; y=Math.random()*280; e.style.background="#f0f"; } }
+        else if (m === "asgore") { if (el<2) { x=Math.random()*548; vy=boss.sp; e.style.background="#ff7f27"; } else if (el<4) { x=560; y=Math.random()*268; vx=-boss.sp; e.style.background="#3333ff"; } else { let c=Math.random()<0.5; x=c?0:548; y=c?0:268; vx=c?boss.sp:-boss.sp; vy=c?boss.sp:-boss.sp; e.style.background="#f00"; } }
+        else if (m === "sans") { e.style.background="#0ff"; e.style.boxShadow="0 0 8px #0ff"; if (el<2) { x=Math.random()*548; vy=boss.sp; m="s-gst"; } else if (el<4) { x=Math.random()<0.5?0:548; y=Math.random()*268; vx=x===0?boss.sp+1:-boss.sp-1; } else { let c=Math.floor(Math.random()*4); x=c%2===0?0:548; y=c<2?0:268; let d=Math.sqrt((hX-x)**2+(hY-y)**2); vx=((hX-x)/d)*(boss.sp+1.5); vy=((hY-y)/d)*(boss.sp+1.5); } }
+        else if (m === "undyne") { e.style.background="#0f0"; e.style.boxShadow="0 0 8px #0f0"; if (el<2) { let a=Math.random()*Math.PI*2; x=hX+Math.cos(a)*180; y=hY+Math.sin(a)*180; let d=Math.sqrt((hX-x)**2+(hY-y)**2); vx=((hX-x)/d)*boss.sp; vy=((hY-y)/d)*boss.sp; } else if (el<4) { x=560; y=Math.random()*268; vx=-boss.sp-1.5; } else { x=Math.random()*548; vy=boss.sp+2; m="u-spr"; } }
+        e.style.left = x+"px"; e.style.top = y+"px"; bArr.push({ e:e, x:x, y:y, vx:vx, vy:vy, m:m, t:0, sk:false });
+    }
+
+    function loop() {
+        if (over || !enemy) return;
+        if (keys.ArrowUp && hY>0) hY-=5; if (keys.ArrowDown && hY<264) hY+=5; if (keys.ArrowLeft && hX>0) hX-=5; if (keys.ArrowRight && hX<544) hX+=5;
+        hEl.style.left = hX+"px"; hEl.style.top = hY+"px";
+        if (inv>0) { inv--; hEl.style.opacity = inv%4===0?"0.3":"1"; } else { hEl.style.opacity="1"; }
+
+        if (inv === 0) {
+            let ic = false; const crs = [{x:0,y:0},{x:544,y:0},{x:0,y:264},{x:544,y:264}];
+            for (let c of crs) { if (Math.sqrt((hX-c.x)**2+(hY-c.y)**2)<24) { ic=true; break; } }
+            if (ic) { hp-=7; inv=24; document.getElementById("txt").innerHTML = "<span style='color:#f00'>* ⚠️ 枠の「角（かど）」に触れてダメージ！</span>"; if (hp<=0) die(); uUI(); }
+        }
+        
+        for (let i = bArr.length-1; i>=0; i--) {
+            let b = bArr[i]; b.t += 0.08; let w=12, h=12;
+            if (b.m === "f-fall") { b.y+=b.vy; if(b.y>=268) { b.m="f-splt"; b.vx=Math.random()<0.5?3.5:-3.5; b.vy=-1.5; } }
+            else if (b.m === "b-shk") { if (!b.sk) { b.vx+=0.04; if (b.vx>1.2) { let d=Math.sqrt((hX-b.x)**2+(hY-b.y)**2); if(d>5) { b.x+=((hX-b.x)/d)*16; b.y+=((hY-b.y)/d)*16; } else { b.sk=true; } } } }
+            else if (b.m === "l-crs") { b.t+=0.05; if(b.t>1.5) { b.m="l-exp"; b.vx=4; b.vy=4; b.e.style.background="#0ff"; } }
+            else if (b.m === "l-exp") { b.x+=b.vx; b.y+=b.vy; }
+            else if (b.m === "s-bnc" || b.m === "s-gst") { if(b.m === "s-gst"){ if(!b.sk){ b.vx+=0.03; if(b.vx<1.0){ b.e.style.width="560px"; b.e.style.height="2px"; b.e.style.background="#ff0"; b.x=0; } else if(b.vx<1.8){ b.e.style.height="40px"; b.e.style.background="#fff"; b.e.style.boxShadow="0 0 15px #0ff"; w=560; h=40; } else { b.sk=true; } } } else { b.x+=Math.sin(b.t)*b.vx; b.y+=b.vy; } }
+            else { b.x+=b.vx; b.y+=b.vy; }
+            
+            b.e.style.left=b.x+"px"; b.e.style.top=b.y+"px";
+            if (b.y>280 || b.y<-40 || b.x>580 || b.x<-40 || b.sk) { b.e.remove(); bArr.splice(i,1); continue; }
+            if (inv===0 && hX<b.x+w && hX+16>b.x && hY<b.y+h && hY+16>b.y) { hp-=7; inv=24; b.e.remove(); bArr.splice(i,1); if (hp<=0) die(); uUI(); }
+        }
+    }
+    function die() { hp=0; over=true; clearInterval(bTim); hEl.style.display="none"; toggleL(false); document.getElementById("txt").innerHTML = "<span style='color:#f33'>💀 けつい が くだけちった…… [スペース]再挑戦</span>"; }
+    function win() {
+        clearInterval(bTim); bArr.forEach(b => b.e.remove()); bArr=[]; hEl.style.display="none"; toggleL(false);
+        document.getElementById("cmds").style.display = "none"; document.getElementById("nxt").style.display = "block";
+        const s = document.getElementById("n-slot");
+        if (bIdx === 3) { s.innerHTML = `<button class="hard-next-btn" onclick="nextB()">😈 GO TO HARD MODE</button>`; document.getElementById("txt").innerHTML = `<span style='color:#f33'>* ✨ 前半戦ボスを没殺！ 【後半戦】へ進め！</span>`; }
+        else if (bIdx < bList.length - 1) { s.innerHTML = `<button class="next-btn" onclick="nextB()">⏩ NEXT BOSS</button>`; document.getElementById("txt").innerHTML = `* ✨ ${boss.n} を撃破した！`; }
+        else { document.getElementById("nxt").style.display = "none"; over = true; clearInterval(gTim); document.getElementById("txt").innerHTML = "<span style='color:#ff0'>🎉 全7ステージ 完全制覇！！！ おめでとう！</span>"; }
+    }
+    function nextB() { bIdx++; document.getElementById("nxt").style.display = "none"; document.getElementById("cmds").style.display = "flex"; loadB(); }
+</script>
+</body>
+</html>
